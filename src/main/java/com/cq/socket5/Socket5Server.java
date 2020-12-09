@@ -12,7 +12,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class SocketServer {
+public class Socket5Server {
 
 
     private static final int SOCKS_PROTOCOL_4 = 0X04;
@@ -38,7 +38,7 @@ public class SocketServer {
     private ByteBuffer writeBuffer = ByteBuffer.allocate(1024);
     private ByteBuffer readBuffer = ByteBuffer.allocate(1024);
 
-    public SocketServer() throws IOException {
+    public Socket5Server() throws IOException {
         buf=ByteBuffer.allocate(bufSize);
         server=ServerSocketChannel.open();
         server.socket().bind(new InetSocketAddress(1080));
@@ -51,6 +51,7 @@ public class SocketServer {
             while(it.hasNext()) {
                 SelectionKey key = it.next();
                 it.remove();
+
                 if(key.isAcceptable()) {
                     accept(key);
                 }

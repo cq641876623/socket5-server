@@ -4,6 +4,6 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        SocketServer socket5= new SocketServer();
+        Socket5Server socket5= new Socket5Server();
     }
 }
