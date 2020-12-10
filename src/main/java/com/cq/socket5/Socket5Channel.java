@@ -86,8 +86,9 @@ public class Socket5Channel {
             int cmd=buf.get(1);
             int atyp=buf.get(3);
             String host=null;
+            int port=-1;
             host=getHost(buf,atyp);
-
+            System.out.println(host);
 
             switch (cmd){
 
@@ -102,7 +103,7 @@ public class Socket5Channel {
         switch (atyp){
             case TYPE_IPV4:
                 tmp = new byte[4];
-                buf.get(tmp,4,4);
+                tmp=getByte(buf,tmp,4,tmp.length);
                 try {
                     host = InetAddress.getByAddress(tmp).getHostAddress();
                 } catch (UnknownHostException e) {
@@ -111,7 +112,7 @@ public class Socket5Channel {
                 break;
             case TYPE_IPV6:
                 tmp = new byte[6];
-                buf.get(tmp,4,6);
+                tmp=getByte(buf,tmp,4,tmp.length);
                 try {
                     host = InetAddress.getByAddress(tmp).getHostAddress();
                 } catch (UnknownHostException e) {
@@ -120,7 +121,7 @@ public class Socket5Channel {
                 break;
             case TYPE_HOST:
                 tmp=new byte[buf.limit()-6];
-                buf.get(tmp,4,tmp.length);
+                tmp=getByte(buf,tmp,4,tmp.length);
                 host=new String(tmp);
                 break;
         }
@@ -128,12 +129,25 @@ public class Socket5Channel {
 
         return host;
     }
+    private int getPort(ByteBuffer buf) {
+       int port=-1;
+//       buf.get()
+
+
+        return port;
+    }
 
     private boolean isSocket5(ByteBuffer buf){
         return buf.get(0)==SOCKS_PROTOCOL_5;
 
     }
 
+
+    public byte[] getByte(ByteBuffer buf,byte[] dst,int offset,int length){
+        for (int i = offset+1,j=0; i < offset + length; i++,j++)
+            dst[j] = buf.get();
+        return dst;
+    }
 
     public byte[] getSend() {
         return send;

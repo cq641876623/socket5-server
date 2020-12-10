@@ -52,7 +52,7 @@ public class Socket5Server {
                     try {
                         read(key);
                     }catch (Exception e){
-
+                        e.printStackTrace();
                     }
                 }
                 if(key.isWritable()){
@@ -94,9 +94,11 @@ public class Socket5Server {
         writeBuffer.clear();
         Socket5Channel channel= (Socket5Channel) key.attachment();
         byte[] send=channel.getSend();
+        writeBuffer.clear();
         writeBuffer.put(send);
-        socketChannel.write(writeBuffer);
+        //将缓冲区各标志复位,因为向里面put了数据标志被改变要想从中读取数据发向服务器,就要复位
         writeBuffer.flip();
+        socketChannel.write(writeBuffer);
         System.out.println("写入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(send)+"");
         socketChannel.register(selector,SelectionKey.OP_READ,channel);
 
@@ -107,11 +109,11 @@ public class Socket5Server {
         readBuffer.clear();
         int numRead=socketChannel.read(readBuffer);
         readBuffer.flip();
-        if(numRead==-1){
-            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
-            key.cancel();
-            socketChannel.close();
-        }
+//        if(numRead==-1){
+//            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
+//            key.cancel();
+//            socketChannel.close();
+//        }
         System.out.println("读入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(readBuffer.array())+"");
         Socket5Channel channel= (Socket5Channel) key.attachment();
 
