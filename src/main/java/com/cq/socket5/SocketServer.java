@@ -17,17 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SocketServer {
 
-
-    private static final int SOCKS_PROTOCOL_4 = 0X04;
-    private static final int SOCKS_PROTOCOL_5 = 0X05;
-    private static final int DEFAULT_BUFFER_SIZE = 1024;
-    private static final byte TYPE_IPV4 = 0x01;
-    private static final byte TYPE_IPV6 = 0X02;
-    private static final byte TYPE_HOST = 0X03;
-    private static final byte ALLOW_PROXY = 0X5A;
-    private static final byte DENY_PROXY = 0X5B;
-
-
+    private List<Socket5Channel> channelList=new ArrayList<>();
 
     private ServerSocketChannel server;
 
@@ -57,12 +47,18 @@ public class SocketServer {
                 if(key.isAcceptable()) {
                     accept(key);
                 }
+                if(key.isReadable()){
+                    try {
+                        read(key);
+                    }catch (Exception e){
+
+                    }
+                }
                 if(key.isWritable()){
                     write(key);
                 }
-                if(key.isReadable()){
-                    read(key);
-                }
+
+
 
 
 
@@ -84,8 +80,9 @@ public class SocketServer {
         ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
         SocketChannel clientChannel = ssc.accept();
         clientChannel.configureBlocking(false);
-        Socket5Channel socket5Channel=new Socket5Channel();
+        Socket5Channel socket5Channel=new Socket5Channel(clientChannel.getRemoteAddress());
         clientChannel.register(selector, SelectionKey.OP_READ,socket5Channel);
+        channelList.add(socket5Channel);
         System.out.println("a new client connected "+clientChannel.getRemoteAddress());
     }
 
@@ -99,83 +96,26 @@ public class SocketServer {
         writeBuffer.put(send);
         socketChannel.write(writeBuffer);
         writeBuffer.flip();
-        socketChannel.register(selector,SelectionKey.OP_READ,2);
-
-
-//        switch (sendMsg.getType()){
-//            case 1:
-//                writeBuffer.put(sendMsg.getMsg());
-//                writeBuffer.flip();
-//                socketChannel.write(writeBuffer);
-//                System.out.println(sendMsg);;
-//                socketChannel.register(selector,SelectionKey.OP_READ,2);
-//                break;
-//            case 2:
-//
-//
-//                break;
-//
-//        }
+        System.out.println("写入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(send)+"");
+        socketChannel.register(selector,SelectionKey.OP_READ,channel);
 
     }
 
     private void read(SelectionKey key) throws IOException{
         SocketChannel socketChannel = (SocketChannel)key.channel();
         readBuffer.clear();
-        long len=socketChannel.read(readBuffer);
+        int numRead=socketChannel.read(readBuffer);
+        readBuffer.flip();
+        if(numRead==-1){
+            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
+            key.cancel();
+            socketChannel.close();
+        }
+        System.out.println("读入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(readBuffer.array())+"");
         Socket5Channel channel= (Socket5Channel) key.attachment();
-        channel.read(readBuffer.array());
-        socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
 
-//        if (1 == (int)key.attachment() && r==3){
-//           byte[] reTmp;
-//           reTmp=readBuffer.array();
-//           int method=0;
-//           if(reTmp[0] == SOCKS_PROTOCOL_5){
-//               method=reTmp[2];
-//               if(  0x02 == reTmp[1]){
-//                   method=0x00;;
-//               }
-//           }
-//
-//           byte[] msg=new byte[]{SOCKS_PROTOCOL_5, (byte) method};
-//           SendMsg sendType=new SendMsg();
-//            sendType.setType(1);
-//            sendType.setMsg(msg);
-//
-//           socketChannel.register(selector,SelectionKey.OP_WRITE,sendType);
-//           return;
-//        }
-//        if(2 == (int)key.attachment() ){
-//            byte[] reTmp;
-//            reTmp=readBuffer.array();
-//            SendMsg sendType=new SendMsg();
-//            sendType.setType(2);
-//            sendType.setMsg(reTmp);
-//            if(sendType.getMsg()[0]==SOCKS_PROTOCOL_5 ){
-//                switch (sendType.getMsg()[1]){
-//                    default:
-//                        byte atyp=sendType.getMsg()[3];
-//                        if(atyp==0x01) {
-//                            byte[] ipv4=new byte[4];
-//                            for(int j=4,i=0;i<4 ;i++){
-//                                ipv4[i]=sendType.getMsg()[j+i];
-//                            }
-//                            System.out.println(InetAddress.getByAddress(ipv4).getHostAddress());
-//                        }
-//                        break;
-//                }
-//            }
-//
-//
-//
-//
-//            socketChannel.register(selector,SelectionKey.OP_WRITE,sendType);
-//
-//            return;
-//        }
-
-
+        channel.read(readBuffer);
+        if(!channel.isClose())socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
 
     }
 
