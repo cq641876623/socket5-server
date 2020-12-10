@@ -7,7 +7,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="socket5" />
+        <module name="socket5-server" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel target="8">
+      <module name="socket5-server" target="8" />
+    </bytecodeTargetLevel>
   </component>
 </project>

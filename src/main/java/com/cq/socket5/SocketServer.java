@@ -96,48 +96,35 @@ public class SocketServer {
         writeBuffer.clear();
         Socket5Channel channel= (Socket5Channel) key.attachment();
         byte[] send=channel.getSend();
-        int len=send.length;
-        while ((len-=writeBuffer.){
-
-        }
         writeBuffer.put(send);
+        socketChannel.write(writeBuffer);
+        writeBuffer.flip();
+        socketChannel.register(selector,SelectionKey.OP_READ,2);
 
 
-        switch (sendMsg.getType()){
-            case 1:
-                writeBuffer.put(sendMsg.getMsg());
-                writeBuffer.flip();
-                socketChannel.write(writeBuffer);
-                System.out.println(sendMsg);;
-                socketChannel.register(selector,SelectionKey.OP_READ,2);
-                break;
-            case 2:
-
-
-                break;
-
-        }
+//        switch (sendMsg.getType()){
+//            case 1:
+//                writeBuffer.put(sendMsg.getMsg());
+//                writeBuffer.flip();
+//                socketChannel.write(writeBuffer);
+//                System.out.println(sendMsg);;
+//                socketChannel.register(selector,SelectionKey.OP_READ,2);
+//                break;
+//            case 2:
+//
+//
+//                break;
+//
+//        }
 
     }
 
     private void read(SelectionKey key) throws IOException{
         SocketChannel socketChannel = (SocketChannel)key.channel();
         readBuffer.clear();
-//        int r=socketChannel.read(readBuffer);
-//        readBuffer.flip();
-
-        List<Byte> byteList=new ArrayList<>();
-        byte[] temp;
-        while (socketChannel.read(readBuffer)!=-1){
-            readBuffer.flip();
-            temp=readBuffer.array();
-            for(byte b:temp)byteList.add(b);
-        }
-        Byte[] result= (Byte[]) byteList.toArray();
-
+        long len=socketChannel.read(readBuffer);
         Socket5Channel channel= (Socket5Channel) key.attachment();
-
-        channel.read(result);
+        channel.read(readBuffer.array());
         socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
 
 //        if (1 == (int)key.attachment() && r==3){

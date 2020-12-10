@@ -11,7 +11,7 @@ public class Socket5Channel {
     private static final byte ALLOW_PROXY = 0X5A;
     private static final byte DENY_PROXY = 0X5B;
 
-    private boolean isconnect;
+    private boolean isinit;
 
     private User user;
 
@@ -24,16 +24,16 @@ public class Socket5Channel {
 
 
 
-    public Socket5Channel read(Byte[] msg){
-        if(isconnect){
-            if(msg[0].byteValue() == SOCKS_PROTOCOL_5){
+    public Socket5Channel read(byte[] msg){
+        if(!isinit){
+            if(msg[0] == SOCKS_PROTOCOL_5){
 
                byte method=msg[2];
                if(  0x02 == msg[1]){
                    method=0x00;;
                }
                this.send=new byte[]{SOCKS_PROTOCOL_5, (byte) method};
-               isconnect=true;
+                isinit=true;
                if(method==0x00)
                isAuthorized=true;
 
