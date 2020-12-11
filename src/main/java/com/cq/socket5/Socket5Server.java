@@ -53,6 +53,8 @@ public class Socket5Server {
                         read(key);
                     }catch (Exception e){
                         e.printStackTrace();
+                        key.cancel();
+                        key.channel().close();
                     }
                 }
                 if(key.isWritable()){
@@ -109,16 +111,22 @@ public class Socket5Server {
         readBuffer.clear();
         int numRead=socketChannel.read(readBuffer);
         readBuffer.flip();
-//        if(numRead==-1){
-//            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
-//            key.cancel();
-//            socketChannel.close();
-//        }
+        if(numRead==-1){
+            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
+            key.cancel();
+            socketChannel.close();
+        }
         System.out.println("读入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(readBuffer.array())+"");
         Socket5Channel channel= (Socket5Channel) key.attachment();
 
-        channel.read(readBuffer);
+        channel.read(readBuffer,socketChannel);
         if(!channel.isClose())socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
+        else {
+            System.out.println("无法应用到协议"+socketChannel.getRemoteAddress());
+            key.cancel();
+            socketChannel.close();
+        }
+
 
     }
 
