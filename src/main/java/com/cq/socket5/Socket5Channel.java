@@ -1,11 +1,15 @@
 package com.cq.socket5;
 
-import com.cq.socket5.exception.NotSocket5Exception;
+
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 
 public class Socket5Channel {
 
@@ -39,9 +43,17 @@ public class Socket5Channel {
 
     private int type;
 
+    private int proxyType=-1;
 
+    private boolean reponseReady=false;
 
+    public boolean isReponseReady() {
+        return reponseReady;
+    }
 
+    public int getType() {
+        return type;
+    }
 
     public boolean isClose() {
         return type == -1;
@@ -54,11 +66,13 @@ public class Socket5Channel {
 
 
 
-    public Socket5Channel read(ByteBuffer buf, SocketChannel socketChannel)  {
+    public Socket5Channel read(ByteBuffer buf, SelectionKey key) throws IOException {
+        SocketChannel socketChannel = (SocketChannel)key.channel();
 
         switch (type){
             case Socket5Status.HANDSHAKE:
 //                协议格式长度校验
+                readBuf(buf,socketChannel,key);
                 init(buf);
                 System.out.println(address+" 进行初始化完毕");
 
@@ -66,6 +80,11 @@ public class Socket5Channel {
             case Socket5Status.IDENTITY_AUTHENTICATION:
                 break;
             case Socket5Status.EXECUTE_THE_ORDER:
+                readBuf(buf,socketChannel,key);
+                execCmd(buf,socketChannel);
+                break;
+            case Socket5Status.PROXY_REQUEST:
+                proxyRequest(buf,socketChannel,proxyType,key);
                 break;
 
 
@@ -73,16 +92,72 @@ public class Socket5Channel {
 
 
 
-        if(isinit&&isAuthorized){
-            execCmd(buf,socketChannel);
-            return this;
-        }
 
 
 
-//        当以上都不执行则表示没匹配到
-        this.isClose=true;
+
         return this;
+
+    }
+
+    private void proxyRequest(ByteBuffer buf, SocketChannel socketChannel, int proxyType,SelectionKey key) {
+        switch (proxyType){
+            case 0x01:
+                if(resultTmp instanceof Socket){
+                    try {
+
+                        OutputStream dstOut=((Socket) resultTmp).getOutputStream();
+                        buf.clear();
+                        int len=-1;
+                        while ( 0 !=(len=socketChannel.read(buf))){
+                            buf.flip();
+                            byte[] buffer=new byte[buf.limit()];
+                            buf.get(buffer);
+                            System.out.println("请求："+new String(buffer));
+                            dstOut.write(buffer);
+                            dstOut.flush();
+                            buf.clear();
+                        }
+                        buf.clear();
+//                        proxyReponse(buf, key);
+
+
+                        reponseReady=true;
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                break;
+        }
+    }
+
+
+    public boolean proxyReponse(ByteBuffer buf,SelectionKey key) throws IOException {
+        byte[] readBuffer=new byte[1024];
+        boolean isclose=false;
+        SocketChannel socketChannel = (SocketChannel)key.channel();
+        InputStream dstIn=((Socket) resultTmp).getInputStream();
+        int len=-1;
+        if(dstIn.read()!=-1){
+            len=dstIn.read(readBuffer);
+            System.out.println("转发结果：  " +Arrays.toString(readBuffer));
+            buf.clear();
+            buf.put(readBuffer,0,len);
+            buf.flip();
+            socketChannel.write(buf);
+
+        }else {
+            key.cancel();
+
+            socketChannel.close();
+
+
+
+            System.out.println("=============请求结束=============");
+            isclose=true;
+        }
+        return isclose;
 
     }
 
@@ -94,12 +169,25 @@ public class Socket5Channel {
             int method=0xFF;
             byte[] methods=new byte[mlen];
             getByte(buf,methods,2,mlen);
+            for(int i=0;i<methods.length;i++){
+               for(int j=0;j<CERTIFICATION_METHOD.length;j++){
+                  if( methods[i]==CERTIFICATION_METHOD[j] ){
+                      method=methods[i];
+                      break;
+                  }
 
-
+               }
+            }
 
             this.send=new byte[]{SOCKS_PROTOCOL_5, (byte) method};
 //               当验证身份方法为无需验证时放行
-            if(method==0x00)isAuthorized=true;
+            if(method==0x00){
+                isAuthorized=true;
+                type=2;
+            }else {
+                type=1;
+            }
+
 
 
         }
@@ -117,6 +205,7 @@ public class Socket5Channel {
             port=getPort(buf);
             System.out.println("host: "+host+" : "+port);
             this.dstRemoteAddress=new InetSocketAddress(host,port);
+            proxyType=cmd;
             switch (cmd){
                 case 0x01:
                     try {
@@ -153,6 +242,7 @@ public class Socket5Channel {
             rsv.flip();
             send=new byte[rsv.limit()];
             rsv.get(send);
+            type=3;
 
         }
     }
@@ -215,5 +305,16 @@ public class Socket5Channel {
 
     public byte[] getSend() {
         return send;
+    }
+
+    private void readBuf(ByteBuffer buf,SocketChannel socketChannel,SelectionKey key) throws IOException {
+        buf.clear();
+        int numRead=socketChannel.read(buf);
+        buf.flip();
+        if(numRead==-1){
+            System.out.println("未读入数据"+socketChannel.getRemoteAddress());
+            key.cancel();
+            socketChannel.close();
+        }
     }
 }
