@@ -61,9 +61,6 @@ public class Socket5Server {
                     }
                 }
 
-                if(key.isWritable()){
-                    write(key);
-                }
 
 
 
@@ -86,6 +83,7 @@ public class Socket5Server {
     private void accept(SelectionKey key) throws IOException {
         ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
         SocketChannel clientChannel = ssc.accept();
+        clientChannel.socket().setSoTimeout(3000);
         clientChannel.configureBlocking(false);
         Socket5Channel socket5Channel=new Socket5Channel(clientChannel.getRemoteAddress());
         clientChannel.register(selector, SelectionKey.OP_READ,socket5Channel);
@@ -94,37 +92,43 @@ public class Socket5Server {
     }
 
 
-
-    private void write(SelectionKey key) throws IOException{
-        SocketChannel socketChannel = (SocketChannel)key.channel();
-        writeBuffer.clear();
-        Socket5Channel channel= (Socket5Channel) key.attachment();
-        if(channel.getType()==Socket5Status.PROXY_REQUEST&&channel.isReponseReady()){
-            if(!channel.proxyReponse(writeBuffer,key)){
-                socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
-            }
-        }else {
-            byte[] send=channel.getSend();
-            writeBuffer.clear();
-            writeBuffer.put(send);
-            //将缓冲区各标志复位,因为向里面put了数据标志被改变要想从中读取数据发向服务器,就要复位
-            writeBuffer.flip();
-            socketChannel.write(writeBuffer);
-            System.out.println("写入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(send)+"");
-            socketChannel.register(selector,SelectionKey.OP_READ,channel);
-        }
-
-
-
-    }
+//
+//    private void write(SelectionKey key) throws IOException{
+//        SocketChannel socketChannel = (SocketChannel)key.channel();
+//        writeBuffer.clear();
+//        Socket5Channel channel= (Socket5Channel) key.attachment();
+////        if(channel.getType()==Socket5Status.PROXY_REQUEST&&channel.isReponseReady()){
+////            if(!channel.proxyReponse(writeBuffer,key)){
+////                socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
+////            }
+////        }else {
+//            byte[] send=channel.getSend();
+//            writeBuffer.clear();
+//            writeBuffer.put(send);
+//            //将缓冲区各标志复位,因为向里面put了数据标志被改变要想从中读取数据发向服务器,就要复位
+//            writeBuffer.flip();
+//            socketChannel.write(writeBuffer);
+//            System.out.println("写入 "+socketChannel.getRemoteAddress() + " "+Arrays.toString(send)+"");
+//            socketChannel.register(selector,SelectionKey.OP_READ,channel);
+////        }
+//
+//
+//
+//    }
 
     private void read(SelectionKey key) throws IOException{
+
+
         SocketChannel socketChannel = (SocketChannel)key.channel();
 
         Socket5Channel channel= (Socket5Channel) key.attachment();
 
         channel.read(readBuffer,key);
-        if(!channel.isClose())socketChannel.register(selector,SelectionKey.OP_WRITE,channel);
+        if(channel.isClose()){
+            key.cancel();
+            socketChannel.close();
+        }
+
 
 
 

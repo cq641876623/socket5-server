@@ -73,7 +73,7 @@ public class Socket5Channel {
             case Socket5Status.HANDSHAKE:
 //                协议格式长度校验
                 readBuf(buf,socketChannel,key);
-                init(buf);
+                init(buf, socketChannel);
                 System.out.println(address+" 进行初始化完毕");
 
                 break;
@@ -113,15 +113,21 @@ public class Socket5Channel {
                             buf.flip();
                             byte[] buffer=new byte[buf.limit()];
                             buf.get(buffer);
-                            System.out.println("请求："+new String(buffer));
+                            System.out.println("请求："+new String(buffer,"UTF-8"));
                             dstOut.write(buffer);
                             dstOut.flush();
                             buf.clear();
                         }
                         buf.clear();
-//                        proxyReponse(buf, key);
+//                        new Thread(()->{
+//                            try {
+                                proxyReponse(buf, key);
+//                            } catch (IOException e) {
+//                                e.printStackTrace();
+//                            }
+//                        }).start();
 
-
+                        type=-1;
                         reponseReady=true;
 
                     } catch (IOException e) {
@@ -139,30 +145,28 @@ public class Socket5Channel {
         SocketChannel socketChannel = (SocketChannel)key.channel();
         InputStream dstIn=((Socket) resultTmp).getInputStream();
         int len=-1;
-        if(dstIn.read()!=-1){
-            len=dstIn.read(readBuffer);
-            System.out.println("转发结果：  " +Arrays.toString(readBuffer));
+        while ((len=dstIn.read(readBuffer))>0){
+            System.out.println("转发结果：  " +new String(readBuffer));
             buf.clear();
             buf.put(readBuffer,0,len);
             buf.flip();
             socketChannel.write(buf);
-
-        }else {
-            key.cancel();
-
-            socketChannel.close();
-
-
-
-            System.out.println("=============请求结束=============");
-            isclose=true;
         }
+//        key.cancel();
+//        socketChannel.shutdownOutput();
+//        socketChannel.close();
+
+
+
+        System.out.println("=============请求结束=============");
+        isclose=true;
+
         return isclose;
 
     }
 
 
-    private void init(ByteBuffer buf){
+    private void init(ByteBuffer buf,SocketChannel socketChannel) throws IOException {
 //            判断是否为SOCKET5协议
         if( buf.get(0) == SOCKS_PROTOCOL_5){
             int mlen=buf.get(1);
@@ -180,6 +184,10 @@ public class Socket5Channel {
             }
 
             this.send=new byte[]{SOCKS_PROTOCOL_5, (byte) method};
+            buf.clear();
+            buf.put(send);
+            buf.flip();
+            socketChannel.write(buf);
 //               当验证身份方法为无需验证时放行
             if(method==0x00){
                 isAuthorized=true;
@@ -193,7 +201,7 @@ public class Socket5Channel {
         }
     }
 
-    private void execCmd(ByteBuffer buf,SocketChannel socketChannel)  {
+    private void execCmd(ByteBuffer buf,SocketChannel socketChannel) throws IOException {
         if(isSocket5(buf)){
             ByteBuffer rsv = ByteBuffer.allocate(10);
             rsv.put((byte) SOCKS_PROTOCOL_5);
@@ -242,6 +250,10 @@ public class Socket5Channel {
             rsv.flip();
             send=new byte[rsv.limit()];
             rsv.get(send);
+            buf.clear();
+            buf.put(send);
+            buf.flip();
+            socketChannel.write(buf);
             type=3;
 
         }
@@ -303,9 +315,6 @@ public class Socket5Channel {
         return dst;
     }
 
-    public byte[] getSend() {
-        return send;
-    }
 
     private void readBuf(ByteBuffer buf,SocketChannel socketChannel,SelectionKey key) throws IOException {
         buf.clear();
