@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 
 public class Socket5Channel {
 
@@ -104,35 +105,48 @@ public class Socket5Channel {
         switch (proxyType){
             case 0x01:
                 if(resultTmp instanceof Socket){
-                    try {
+                        new Thread(
+                                ()->{
+                                    OutputStream dstOut= null;
+                                    try {
+                                        dstOut = ((Socket) resultTmp).getOutputStream();
+                                        buf.clear();
+                                        int len=-1;
+                                        while ( 0 !=(len=socketChannel.read(buf))){
+                                            buf.flip();
+                                            System.out.println("请求");
+                                            byte[] buffer=new byte[buf.limit()];
+                                            buf.get(buffer);
+                                            dstOut.write(buffer);
+                                            dstOut.flush();
+                                            buf.clear();
+                                        }
+                                        buf.clear();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
 
-                        OutputStream dstOut=((Socket) resultTmp).getOutputStream();
-                        buf.clear();
-                        int len=-1;
-                        while ( 0 !=(len=socketChannel.read(buf))){
-                            buf.flip();
-                            byte[] buffer=new byte[buf.limit()];
-                            buf.get(buffer);
-                            System.out.println("请求："+new String(buffer,"UTF-8"));
-                            dstOut.write(buffer);
-                            dstOut.flush();
-                            buf.clear();
-                        }
-                        buf.clear();
-//                        new Thread(()->{
-//                            try {
-                                proxyReponse(buf, key);
-//                            } catch (IOException e) {
-//                                e.printStackTrace();
-//                            }
-//                        }).start();
+                                }
+                        ).start();
 
-                        type=-1;
-                        reponseReady=true;
 
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                        new Thread(
+                                ()->{
+                                    ByteBuffer b=ByteBuffer.allocate(1024);
+                                    try {
+                                        proxyReponse(b, key);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                    System.out.println("响应结束");
+                                }
+                        ).start();
+
+
+
+
+
+
                 }
                 break;
         }
@@ -146,15 +160,11 @@ public class Socket5Channel {
         InputStream dstIn=((Socket) resultTmp).getInputStream();
         int len=-1;
         while ((len=dstIn.read(readBuffer))>0){
-            System.out.println("转发结果：  " +new String(readBuffer));
             buf.clear();
             buf.put(readBuffer,0,len);
             buf.flip();
             socketChannel.write(buf);
         }
-//        key.cancel();
-//        socketChannel.shutdownOutput();
-//        socketChannel.close();
 
 
 

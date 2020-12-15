@@ -124,10 +124,7 @@ public class Socket5Server {
         Socket5Channel channel= (Socket5Channel) key.attachment();
 
         channel.read(readBuffer,key);
-        if(channel.isClose()){
-            key.cancel();
-            socketChannel.close();
-        }
+
 
 
 
