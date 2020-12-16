@@ -142,27 +142,7 @@ public class Socket5Channel {
     }
 
 
-    public boolean proxyReponse(ByteBuffer buf,SelectionKey key) throws IOException {
-        byte[] readBuffer=new byte[1024];
-        boolean isclose=false;
-        SocketChannel socketChannel = (SocketChannel)key.channel();
-        InputStream dstIn=((Socket) resultTmp).getInputStream();
-        int len=-1;
-        while ((len=dstIn.read(readBuffer))>0){
-            buf.clear();
-            buf.put(readBuffer,0,len);
-            buf.flip();
-            socketChannel.write(buf);
-        }
 
-
-
-        System.out.println("=============请求结束=============");
-        isclose=true;
-
-        return isclose;
-
-    }
 
 
     private void init(ByteBuffer buf,SocketChannel socketChannel) throws IOException {
