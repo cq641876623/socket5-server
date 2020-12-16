@@ -21,7 +21,7 @@ public class Socket5Server {
 
     private ServerSocketChannel server;
 
-    private Selector selector;
+    public static Selector selector;
 
 
     private ByteBuffer buf;

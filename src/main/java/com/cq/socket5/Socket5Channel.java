@@ -28,6 +28,13 @@ public class Socket5Channel {
 
 
 
+    public SocketChannel client;
+    public SocketChannel remote;
+
+
+    public long flow=0L;
+
+
 
     private User user;
 
@@ -101,50 +108,32 @@ public class Socket5Channel {
 
     }
 
-    private void proxyRequest(ByteBuffer buf, SocketChannel socketChannel, int proxyType,SelectionKey key) {
+    private void proxyRequest(ByteBuffer buf, SocketChannel socketChannel, int proxyType,SelectionKey key) throws IOException {
         switch (proxyType){
             case 0x01:
-                if(resultTmp instanceof Socket){
-                        new Thread(
-                                ()->{
-                                    OutputStream dstOut= null;
-                                    try {
-                                        dstOut = ((Socket) resultTmp).getOutputStream();
-                                        buf.clear();
-                                        int len=-1;
-                                        while ( 0 !=(len=socketChannel.read(buf))){
-                                            buf.flip();
-                                            System.out.println("请求");
-                                            byte[] buffer=new byte[buf.limit()];
-                                            buf.get(buffer);
-                                            dstOut.write(buffer);
-                                            dstOut.flush();
-                                            buf.clear();
-                                        }
-                                        buf.clear();
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
+                if(resultTmp instanceof SocketChannel){
+                    SocketChannel remote= (SocketChannel) resultTmp;
 
-                                }
-                        ).start();
+                    if(socketChannel.socket().getRemoteSocketAddress().equals(remote.socket().getRemoteSocketAddress())){
+                        buf.clear();
+                        while(socketChannel.read(buf)>0){
+                            buf.flip();
+                            flow+=buf.limit();
+                            client.write(buf);
+                            buf.clear();
 
-
-                        new Thread(
-                                ()->{
-                                    ByteBuffer b=ByteBuffer.allocate(1024);
-                                    try {
-                                        proxyReponse(b, key);
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
-                                    System.out.println("响应结束");
-                                }
-                        ).start();
-
-
-
-
+                        }
+                    }
+                    if(socketChannel.socket().getRemoteSocketAddress().equals(client.socket().getRemoteSocketAddress())){
+                        buf.clear();
+                        while(socketChannel.read(buf)>0){
+                            buf.flip();
+                            flow+=buf.limit();
+                            remote.write(buf);
+                            buf.clear();
+                        }
+                    }
+                    System.out.println("主机： "+client.socket().getRemoteSocketAddress() + "当前流量："+flow+" b");
 
 
                 }
@@ -227,7 +216,12 @@ public class Socket5Channel {
             switch (cmd){
                 case 0x01:
                     try {
-                        resultTmp = new Socket(dstRemoteAddress.getAddress(),dstRemoteAddress.getPort());
+                        this.client=socketChannel;
+                        SocketChannel remote = SocketChannel.open(new InetSocketAddress(dstRemoteAddress.getAddress(),dstRemoteAddress.getPort()));
+                        resultTmp=remote;
+                        remote.configureBlocking(false);
+                        remote.register(Socket5Server.selector,SelectionKey.OP_READ,this);
+                        this.remote=remote;
                         rsv.put((byte) 0x00);
                     } catch (IOException e) {
                         e.printStackTrace();

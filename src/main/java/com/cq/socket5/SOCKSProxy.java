@@ -181,21 +181,21 @@ public class SOCKSProxy {
                 }
             }
 
-            // client timeout check
-            for (int i = 0; i < clients.size(); i++) {
-                SocksClient cl = clients.get(i);
-                if((System.currentTimeMillis() - cl.lastData) > 30000L) {
-                    cl.client.close();
-                    if(cl.remote != null){
-                        cl.remote.close();
-                    }
-                    clients.remove(cl);
-                }
-            }
-            if(clients.size() != lastClients) {
-                System.out.println(clients.size());
-                lastClients = clients.size();
-            }
+//            // client timeout check
+//            for (int i = 0; i < clients.size(); i++) {
+//                SocksClient cl = clients.get(i);
+//                if((System.currentTimeMillis() - cl.lastData) > 30000L) {
+//                    cl.client.close();
+//                    if(cl.remote != null){
+//                        cl.remote.close();
+//                    }
+//                    clients.remove(cl);
+//                }
+//            }
+//            if(clients.size() != lastClients) {
+//                System.out.println(clients.size());
+//                lastClients = clients.size();
+//            }
         }
     }
 
