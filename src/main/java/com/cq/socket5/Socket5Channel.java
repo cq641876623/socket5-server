@@ -3,14 +3,20 @@ package com.cq.socket5;
 
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.Arrays;
-import java.util.concurrent.CountDownLatch;
+import java.nio.charset.Charset;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import static com.cq.socket5.Session.sf;
+import static com.cq.socket5.Session.treadpool;
+
 
 public class Socket5Channel {
 
@@ -25,15 +31,11 @@ public class Socket5Channel {
     private static final byte ALLOW_PROXY = 0X5A;
     private static final byte DENY_PROXY = 0X5B;
 
-
-
-
     public SocketChannel client;
     public SocketChannel remote;
 
 
-    public long flow=0L;
-
+    public String uid;
 
 
     private User user;
@@ -70,6 +72,7 @@ public class Socket5Channel {
     public Socket5Channel(SocketAddress address) {
         this.address=address;
         this.type = 0;
+        this.uid= UUID.randomUUID().toString();
     }
 
 
@@ -89,10 +92,31 @@ public class Socket5Channel {
                 break;
             case Socket5Status.EXECUTE_THE_ORDER:
                 readBuf(buf,socketChannel,key);
-                execCmd(buf,socketChannel);
+                Socket5Channel that1=this;
+                treadpool.submit(()->{
+                    try {
+                        that1.execCmd(buf,socketChannel);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                });
+
                 break;
             case Socket5Status.PROXY_REQUEST:
-                proxyRequest(buf,socketChannel,proxyType,key);
+                Socket5Channel that=this;
+//                treadpool.submit(()->{
+//                    try {
+                        that.proxyRequest(buf,socketChannel,proxyType,key);
+//                            } catch (Exception e) {
+//                                e.printStackTrace();
+//                            }
+//                });
+
+
+
+
+
+
                 break;
 
 
@@ -108,32 +132,89 @@ public class Socket5Channel {
 
     }
 
-    private void proxyRequest(ByteBuffer buf, SocketChannel socketChannel, int proxyType,SelectionKey key) throws IOException {
+
+    private synchronized void proxyRequest(ByteBuffer buf, SocketChannel socketChannel, int proxyType,SelectionKey key) throws IOException {
+        if(Session.sf.get()==null){
+            Session.sf.set(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+        }
+
+        Date now=new Date();
+
         switch (proxyType){
             case 0x01:
                 if(resultTmp instanceof SocketChannel){
+
+
+
                     SocketChannel remote= (SocketChannel) resultTmp;
 
-                    if(socketChannel.socket().getRemoteSocketAddress().equals(remote.socket().getRemoteSocketAddress())){
-                        buf.clear();
-                        while(socketChannel.read(buf)>0){
-                            buf.flip();
-                            flow+=buf.limit();
-                            client.write(buf);
-                            buf.clear();
 
+                    if(client.socket().getRemoteSocketAddress()==null || remote==null ){
+                        System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+": 该应用已断开连接 因为==null");
+                        key.cancel();
+                        socketChannel.shutdownOutput();
+                        socketChannel.shutdownInput();
+                        key.channel().close();
+                        return;
+                    }
+
+                    if(!socketChannel.isConnected()){
+                        System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+this.uid+": 该应用已断开连接");
+                        key.cancel();
+                        socketChannel.shutdownOutput();
+                        socketChannel.shutdownInput();
+                        key.channel().close();
+                        return;
+                    }
+
+                    ByteBuffer buffer=ByteBuffer.allocate(1024);
+                    int total=0;
+                    String type="";
+                    if(socketChannel.socket().getRemoteSocketAddress().equals(remote.socket().getRemoteSocketAddress())){
+                        type="远";
+                        buffer.clear();
+                        int len1=0;
+                        while((len1=socketChannel.read(buffer))>0){
+                            buffer.flip();
+                            client.write(buffer);
+                            buffer.clear();
+                            total+=len1;
                         }
+                        if(len1==-1){
+                            System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+this.uid+": 应用关闭");
+                            key.cancel();
+                            socketChannel.shutdownOutput();
+                            socketChannel.shutdownInput();
+                            key.channel().close();
+                            return;
+                        }
+
                     }
                     if(socketChannel.socket().getRemoteSocketAddress().equals(client.socket().getRemoteSocketAddress())){
+
+                        type="近";
+
                         buf.clear();
-                        while(socketChannel.read(buf)>0){
-                            buf.flip();
-                            flow+=buf.limit();
-                            remote.write(buf);
-                            buf.clear();
+                        int len2=0;
+
+                        while((len2=socketChannel.read(buffer))>0){
+                            buffer.flip();
+                            remote.write(buffer);
+                            buffer.clear();
+                            total+=len2;
+                        }
+                        if(len2==-1){
+                            System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+this.uid+": 应用关闭");
+                            key.cancel();
+                            socketChannel.shutdownOutput();
+                            socketChannel.shutdownInput();
+                            key.channel().close();
+                            return;
                         }
                     }
-                    System.out.println("主机： "+client.socket().getRemoteSocketAddress() + "当前流量："+flow+" b");
+
+
+                    System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+this.uid+": 从"+type+"端读取数据："+total);
 
 
                 }
@@ -180,7 +261,7 @@ public class Socket5Channel {
         }
     }
 
-    private void execCmd(ByteBuffer buf,SocketChannel socketChannel) throws IOException {
+    private synchronized void execCmd(ByteBuffer buf,SocketChannel socketChannel) throws IOException {
         if(isSocket5(buf)){
             ByteBuffer rsv = ByteBuffer.allocate(10);
             rsv.put((byte) SOCKS_PROTOCOL_5);
@@ -197,11 +278,17 @@ public class Socket5Channel {
                 case 0x01:
                     try {
                         this.client=socketChannel;
-                        SocketChannel remote = SocketChannel.open(new InetSocketAddress(dstRemoteAddress.getAddress(),dstRemoteAddress.getPort()));
+                        Date now=new Date();
+                        long startTime=System.nanoTime();
+                        if(Session.sf.get()==null){
+                            Session.sf.set(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));}
+
+                            SocketChannel remote = SocketChannel.open(new InetSocketAddress(dstRemoteAddress.getAddress(),dstRemoteAddress.getPort()));
+                        long endTime=System.nanoTime();
+                        System.out.println(sf.get().format(now)+"  "+socketChannel.getRemoteAddress()+"   ->   "+remote.getRemoteAddress()+"     "+this.uid+": 连接远端读取数据共耗时："+ TimeUnit.NANOSECONDS.toMicros(endTime-startTime) +"ms");
                         resultTmp=remote;
                         remote.configureBlocking(false);
                         remote.register(Socket5Server.selector,SelectionKey.OP_READ,this);
-                        this.remote=remote;
                         rsv.put((byte) 0x00);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -309,5 +396,16 @@ public class Socket5Channel {
             key.cancel();
             socketChannel.close();
         }
+    }
+
+    public static String AsciiToString(byte[] result2) {
+        StringBuilder sbu = new StringBuilder();
+        for (byte b : result2) {
+            if (0 == b) {
+                break;
+            }
+            sbu.append((char) Integer.parseInt(String.valueOf(b)));
+        }
+        return sbu.toString();
     }
 }

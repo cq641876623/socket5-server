@@ -133,10 +133,8 @@ public class MySocket5Server implements Runnable {
 
     private Socket convertToSocket5(InputStream inputStream, OutputStream outputStream) throws IOException {
         Socket proxySocket = null;
-        int len=inputStream.read();
-
         //处理SOCKS5头信息(不支持登录)
-        byte[] tmp = new byte[len];
+        byte[] tmp = new byte[2];
         inputStream.read(tmp);
         byte method = tmp[1];
         if (0x02 == tmp[0]) {

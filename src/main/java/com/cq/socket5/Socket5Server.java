@@ -9,15 +9,13 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Socket5Server {
 
-    private List<Socket5Channel> channelList=new ArrayList<>();
+
+//    private List<Socket5Channel> channelList=new ArrayList<>();
 
     private ServerSocketChannel server;
 
@@ -28,7 +26,6 @@ public class Socket5Server {
 
     private int bufSize=2*1024*1024;
 
-    private ByteBuffer writeBuffer = ByteBuffer.allocate(bufSize);
     private ByteBuffer readBuffer = ByteBuffer.allocate(bufSize);
 
     public Socket5Server() throws IOException {
@@ -41,13 +38,21 @@ public class Socket5Server {
 
         while (selector.select()>0){
             Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+
             while(it.hasNext()) {
                 SelectionKey key = it.next();
                 it.remove();
 
+                if(!key.isValid()){
+                    key.cancel();
+                    key.cancel();
+                    key.channel().close();
+
+                }
                 if(key.isAcceptable()) {
                     accept(key);
                 }
+
 
 
 
@@ -87,7 +92,6 @@ public class Socket5Server {
         clientChannel.configureBlocking(false);
         Socket5Channel socket5Channel=new Socket5Channel(clientChannel.getRemoteAddress());
         clientChannel.register(selector, SelectionKey.OP_READ,socket5Channel);
-        channelList.add(socket5Channel);
         System.out.println("a new client connected "+clientChannel.getRemoteAddress());
     }
 
